@@ -56,11 +56,11 @@ const ADDR_TYPE_IPV6ADDR: u8 = 0x04;
 fn put_ip(ip: &IpAddr, buf: &mut BytesMut) {
     match ip {
         IpAddr::V4(ip) => {
-            buf.put(ADDR_TYPE_IPV4ADDR);
+            buf.put_u8(ADDR_TYPE_IPV4ADDR);
             buf.put(&ip.octets()[..]);
         }
         IpAddr::V6(ip) => {
-            buf.put(ADDR_TYPE_IPV6ADDR);
+            buf.put_u8(ADDR_TYPE_IPV6ADDR);
             buf.put(&ip.octets()[..]);
         }
     };
@@ -123,14 +123,14 @@ pub async fn connect<A: ToSocketAddrsExt, T: AsRef<str>>(
         }
 
         buf.clear();
-        buf.put("\x05\x01\x00");
+        buf.put(&b"\x05\x01\x00"[..]);
         match proxy_url.scheme() {
             "socks5" => {
                 let addr = addrs[addr_idx];
                 trace!("connect {}", addr);
                 let ip = addr.ip();
                 put_ip(&ip, &mut buf);
-                buf.put_u16_be(addr.port());
+                buf.put(addr.port().to_be_bytes().as_ref());
             }
             "socks5h" => {
                 let addr = addr2.clone();
@@ -146,12 +146,12 @@ pub async fn connect<A: ToSocketAddrsExt, T: AsRef<str>>(
                         if host.len() > 255 {
                             return Err(io::Error::new(io::ErrorKind::Other, "FQDN too long"));
                         }
-                        buf.put(ADDR_TYPE_DOMAINNAME);
+                        buf.put_u8(ADDR_TYPE_DOMAINNAME);
                         buf.put_u8(host.len() as u8);
-                        buf.put(&host);
+                        buf.put(host.as_bytes());
                     }
                 }
-                buf.put_u16_be(port);
+                buf.put(port.to_be_bytes().as_ref());
             }
             _ => {
                 return Err(io::Error::new(
